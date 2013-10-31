@@ -2838,9 +2838,6 @@ static void listenCallback (int fd, short flags, void *param) {
     struct sockaddr_un peeraddr;
     socklen_t socklen = sizeof (peeraddr);
 
-    struct ucred creds;
-    socklen_t szCreds = sizeof(creds);
-
     struct passwd *pwd = NULL;
 
     assert (s_fdCommand < 0);
@@ -2853,44 +2850,6 @@ static void listenCallback (int fd, short flags, void *param) {
         /* start listening for new connections again */
         rilEventAddWakeup(&s_listen_event);
 	      return;
-    }
-
-    /* check the credential of the other side and only accept socket from
-     * phone process
-     */
-    errno = 0;
-    is_phone_socket = 0;
-
-    err = getsockopt(s_fdCommand, SOL_SOCKET, SO_PEERCRED, &creds, &szCreds);
-
-    if (err == 0 && szCreds > 0) {
-        errno = 0;
-        pwd = getpwuid(creds.uid);
-        if (pwd != NULL) {
-            if (strcmp(pwd->pw_name, PHONE_PROCESS) == 0) {
-                is_phone_socket = 1;
-            } else {
-                RLOGE("RILD can't accept socket from process %s", pwd->pw_name);
-            }
-        } else {
-            RLOGE("Error on getpwuid() errno: %d", errno);
-        }
-    } else {
-        RLOGD("Error on getsockopt() errno: %d", errno);
-    }
-
-    if ( !is_phone_socket ) {
-      RLOGE("RILD must accept socket from %s", PHONE_PROCESS);
-
-      close(s_fdCommand);
-      s_fdCommand = -1;
-
-      onCommandsSocketClosed();
-
-      /* start listening for new connections again */
-      rilEventAddWakeup(&s_listen_event);
-
-      return;
     }
 
     ret = fcntl(s_fdCommand, F_SETFL, O_NONBLOCK);
